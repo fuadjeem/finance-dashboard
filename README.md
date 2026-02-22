@@ -1,6 +1,8 @@
 # FinanceFlow — Personal Finance Dashboard
 
-A beautiful, full-stack personal finance dashboard built with Next.js, Prisma (SQLite), and NextAuth.
+🔗 **Live Demo:** [https://finance-dashboard.fuadxeem.workers.dev](https://finance-dashboard.fuadxeem.workers.dev)
+
+A beautiful, full-stack personal finance dashboard built with Next.js and deployed on Cloudflare Workers.
 
 ## Features
 
@@ -13,11 +15,12 @@ A beautiful, full-stack personal finance dashboard built with Next.js, Prisma (S
 
 ## Tech Stack
 
-- **Frontend:** Next.js 15 (App Router), React, Recharts
-- **Backend:** Next.js API Routes
-- **Database:** SQLite via Prisma ORM
+- **Frontend:** Next.js 16 (App Router), React, Recharts
+- **Backend:** Next.js API Routes, Cloudflare Workers
+- **Database:** Cloudflare D1 (production), SQLite via Prisma (development)
 - **Auth:** NextAuth.js v4 (Credentials provider, JWT sessions)
 - **Styling:** Vanilla CSS (dark mode, glassmorphism)
+- **Deployment:** Cloudflare Workers (free tier) via @opennextjs/cloudflare
 
 ## Getting Started
 
@@ -25,11 +28,11 @@ A beautiful, full-stack personal finance dashboard built with Next.js, Prisma (S
 
 - Node.js 18+ and npm
 
-### Setup
+### Local Development
 
 ```bash
 # 1. Clone the repo
-git clone <your-repo-url>
+git clone https://github.com/fuadjeem/finance-dashboard.git
 cd finance-dashboard
 
 # 2. Install dependencies
@@ -51,13 +54,34 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) and create an account.
 
+### Deploy to Cloudflare
+
+```bash
+# 1. Login to Cloudflare
+npx wrangler login
+
+# 2. Create D1 database
+npx wrangler d1 create finance-dashboard-db
+# Update wrangler.jsonc with the database_id
+
+# 3. Initialize schema
+npx wrangler d1 execute finance-dashboard-db --remote --file=prisma/migrations/init.sql
+
+# 4. Set secrets
+npx wrangler secret put NEXTAUTH_SECRET
+npx wrangler secret put NEXTAUTH_URL
+
+# 5. Deploy
+npm run deploy
+```
+
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | SQLite connection string (`file:./dev.db`) |
+| `DATABASE_URL` | SQLite connection string (`file:./dev.db`) — local dev only |
 | `NEXTAUTH_SECRET` | Random secret for JWT signing |
-| `NEXTAUTH_URL` | Your app URL (`http://localhost:3000`) |
+| `NEXTAUTH_URL` | Your app URL (`http://localhost:3000` or production URL) |
 
 > ⚠️ **Never commit `.env` to git.** Use `.env.example` as a template.
 
@@ -67,7 +91,7 @@ Open [http://localhost:3000](http://localhost:3000) and create an account.
 finance-dashboard/
 ├── prisma/
 │   ├── schema.prisma       # Database models
-│   └── migrations/         # Migration files
+│   └── migrations/         # Migration files (including D1 init.sql)
 ├── src/
 │   ├── app/
 │   │   ├── api/            # API routes
@@ -82,14 +106,16 @@ finance-dashboard/
 │   │       ├── transactions/ # Full transaction list
 │   │       └── settings/   # Category management
 │   ├── components/         # Reusable components
-│   └── lib/                # Prisma client, auth config
+│   └── lib/                # D1 data layer, auth config
+├── wrangler.jsonc          # Cloudflare Workers config
+├── open-next.config.ts     # OpenNext adapter config
 ├── .env.example            # Environment template
 └── README.md
 ```
 
 ## Privacy
 
-- SQLite database file (`*.db`) is in `.gitignore`
+- Database files (`*.db`) are in `.gitignore`
 - `.env` is in `.gitignore`
 - No real data or secrets in the repo
 - All user data is isolated by `userId`
