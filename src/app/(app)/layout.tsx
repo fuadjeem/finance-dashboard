@@ -67,7 +67,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                     <button
                         className="btn btn-ghost btn-full"
-                        onClick={() => signOut({ callbackUrl: "/login" })}
+                        onClick={async () => {
+                            await signOut({ redirect: false });
+                            router.push("/login");
+                        }}
                     >
                         🚪 Sign Out
                     </button>

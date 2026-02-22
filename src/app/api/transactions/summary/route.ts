@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { findTransactionsForSummary } from "@/lib/d1";
 import { getSessionUser } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
@@ -24,13 +24,7 @@ export async function GET(req: NextRequest) {
     const startStr = startDate.toISOString().slice(0, 10);
     const endStr = endDate.toISOString().slice(0, 10);
 
-    const transactions = await prisma.transaction.findMany({
-        where: {
-            userId: user.id,
-            date: { gte: startStr, lte: endStr },
-        },
-        select: { type: true, amountCents: true, date: true },
-    });
+    const transactions = await findTransactionsForSummary(user.id, startStr, endStr);
 
     // Aggregate by month
     const monthlyData: Record<string, { income: number; costs: number }> = {};

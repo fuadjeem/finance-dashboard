@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hash } from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { findUserByEmail, createUser, createManyCategories } from "@/lib/d1";
 
 const DEFAULT_COST_CATEGORIES = [
     "Food & Dining",
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const existing = await prisma.user.findUnique({ where: { email } });
+        const existing = await findUserByEmail(email);
         if (existing) {
             return NextResponse.json(
                 { error: "Email already registered" },
@@ -58,25 +58,22 @@ export async function POST(req: NextRequest) {
 
         const passwordHash = await hash(password, 12);
 
-        const user = await prisma.user.create({
-            data: {
-                name,
-                email,
-                passwordHash,
-                categories: {
-                    create: [
-                        ...DEFAULT_COST_CATEGORIES.map((cat) => ({
-                            name: cat,
-                            type: "COST",
-                        })),
-                        ...DEFAULT_INCOME_CATEGORIES.map((cat) => ({
-                            name: cat,
-                            type: "INCOME",
-                        })),
-                    ],
-                },
-            },
-        });
+        const user = await createUser({ name, email, passwordHash });
+
+        // Create default categories
+        const allCategories = [
+            ...DEFAULT_COST_CATEGORIES.map((cat) => ({
+                userId: user.id,
+                name: cat,
+                type: "COST",
+            })),
+            ...DEFAULT_INCOME_CATEGORIES.map((cat) => ({
+                userId: user.id,
+                name: cat,
+                type: "INCOME",
+            })),
+        ];
+        await createManyCategories(allCategories);
 
         return NextResponse.json(
             { message: "Account created", userId: user.id },

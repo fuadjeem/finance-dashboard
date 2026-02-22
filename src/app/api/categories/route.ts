@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { findCategories, findCategoryByNameAndType, createCategory } from "@/lib/d1";
 import { getSessionUser } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
@@ -7,18 +7,10 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type");
+    const type = searchParams.get("type") || undefined;
     const activeOnly = searchParams.get("active") !== "false";
 
-    const where: Record<string, unknown> = { userId: user.id };
-    if (type) where.type = type;
-    if (activeOnly) where.active = true;
-
-    const categories = await prisma.category.findMany({
-        where,
-        orderBy: { name: "asc" },
-    });
-
+    const categories = await findCategories(user.id, { type, activeOnly });
     return NextResponse.json(categories);
 }
 
@@ -36,10 +28,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Type must be INCOME or COST" }, { status: 400 });
         }
 
-        // Check for duplicate
-        const existing = await prisma.category.findFirst({
-            where: { userId: user.id, name: name.trim(), type },
-        });
+        const existing = await findCategoryByNameAndType(user.id, name.trim(), type);
         if (existing) {
             return NextResponse.json(
                 { error: "Category already exists" },
@@ -47,10 +36,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const category = await prisma.category.create({
-            data: { userId: user.id, name: name.trim(), type },
-        });
-
+        const category = await createCategory({ userId: user.id, name: name.trim(), type });
         return NextResponse.json(category, { status: 201 });
     } catch {
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

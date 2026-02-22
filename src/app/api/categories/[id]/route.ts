@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { findCategoryById, updateCategory } from "@/lib/d1";
 import { getSessionUser } from "@/lib/session";
 
 export async function PUT(
@@ -11,9 +11,7 @@ export async function PUT(
 
     const { id } = await params;
 
-    const existing = await prisma.category.findFirst({
-        where: { id, userId: user.id },
-    });
+    const existing = await findCategoryById(id, user.id);
     if (!existing) {
         return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
@@ -21,15 +19,11 @@ export async function PUT(
     try {
         const { name, active } = await req.json();
 
-        const data: Record<string, unknown> = {};
+        const data: { name?: string; active?: boolean } = {};
         if (name !== undefined) data.name = name.trim();
         if (active !== undefined) data.active = active;
 
-        const category = await prisma.category.update({
-            where: { id },
-            data,
-        });
-
+        const category = await updateCategory(id, data);
         return NextResponse.json(category);
     } catch {
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { findTransactionById, findCategoryById, updateTransaction, deleteTransaction } from "@/lib/d1";
 import { getSessionUser } from "@/lib/session";
 
 export async function PUT(
@@ -11,9 +11,7 @@ export async function PUT(
 
     const { id } = await params;
 
-    const existing = await prisma.transaction.findFirst({
-        where: { id, userId: user.id },
-    });
+    const existing = await findTransactionById(id, user.id);
     if (!existing) {
         return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
     }
@@ -32,24 +30,18 @@ export async function PUT(
         }
 
         if (categoryId) {
-            const category = await prisma.category.findFirst({
-                where: { id: categoryId, userId: user.id },
-            });
+            const category = await findCategoryById(categoryId, user.id);
             if (!category) {
                 return NextResponse.json({ error: "Invalid category" }, { status: 400 });
             }
         }
 
-        const transaction = await prisma.transaction.update({
-            where: { id },
-            data: {
-                ...(type && { type }),
-                ...(amountCents && { amountCents: Math.round(amountCents) }),
-                ...(categoryId && { categoryId }),
-                ...(date && { date }),
-                ...(note !== undefined && { note }),
-            },
-            include: { category: { select: { name: true } } },
+        const transaction = await updateTransaction(id, {
+            type,
+            amountCents: amountCents ? Math.round(amountCents) : undefined,
+            categoryId,
+            date,
+            note,
         });
 
         return NextResponse.json(transaction);
@@ -67,13 +59,11 @@ export async function DELETE(
 
     const { id } = await params;
 
-    const existing = await prisma.transaction.findFirst({
-        where: { id, userId: user.id },
-    });
+    const existing = await findTransactionById(id, user.id);
     if (!existing) {
         return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
     }
 
-    await prisma.transaction.delete({ where: { id } });
+    await deleteTransaction(id);
     return NextResponse.json({ message: "Deleted" });
 }

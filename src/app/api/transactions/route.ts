@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { findTransactions, findCategoryById, createTransaction } from "@/lib/d1";
 import { getSessionUser } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
@@ -7,36 +7,23 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type");
-    const categoryId = searchParams.get("categoryId");
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
-    const search = searchParams.get("search");
+    const type = searchParams.get("type") || undefined;
+    const categoryId = searchParams.get("categoryId") || undefined;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
+    const search = searchParams.get("search") || undefined;
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    const where: Record<string, unknown> = { userId: user.id };
-    if (type) where.type = type;
-    if (categoryId) where.categoryId = categoryId;
-    if (startDate || endDate) {
-        where.date = {};
-        if (startDate) (where.date as Record<string, string>).gte = startDate;
-        if (endDate) (where.date as Record<string, string>).lte = endDate;
-    }
-    if (search) {
-        where.note = { contains: search };
-    }
-
-    const [transactions, total] = await Promise.all([
-        prisma.transaction.findMany({
-            where,
-            include: { category: { select: { name: true } } },
-            orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-            take: limit,
-            skip: offset,
-        }),
-        prisma.transaction.count({ where }),
-    ]);
+    const { transactions, total } = await findTransactions(user.id, {
+        type,
+        categoryId,
+        startDate,
+        endDate,
+        search,
+        limit,
+        offset,
+    });
 
     return NextResponse.json({ transactions, total });
 }
@@ -62,23 +49,18 @@ export async function POST(req: NextRequest) {
         }
 
         // Verify category belongs to user
-        const category = await prisma.category.findFirst({
-            where: { id: categoryId, userId: user.id },
-        });
+        const category = await findCategoryById(categoryId, user.id);
         if (!category) {
             return NextResponse.json({ error: "Invalid category" }, { status: 400 });
         }
 
-        const transaction = await prisma.transaction.create({
-            data: {
-                userId: user.id,
-                categoryId,
-                type,
-                amountCents: Math.round(amountCents),
-                date,
-                note: note || "",
-            },
-            include: { category: { select: { name: true } } },
+        const transaction = await createTransaction({
+            userId: user.id,
+            categoryId,
+            type,
+            amountCents: Math.round(amountCents),
+            date,
+            note: note || "",
         });
 
         return NextResponse.json(transaction, { status: 201 });

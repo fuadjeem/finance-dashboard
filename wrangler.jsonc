@@ -1,0 +1,22 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "finance-dashboard",
+	"compatibility_date": "2026-02-22",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	// D1 database binding — update database_id after running:
+	// npx wrangler d1 create finance-dashboard-db
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "finance-dashboard-db",
+			"database_id": "36bbd721-f4a2-4410-95e3-09792a20b1ee"
+		}
+	]
+}
