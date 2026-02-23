@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import Link from "next/link";
 import TransactionModal from "@/components/TransactionModal";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 
 interface SummaryItem {
     month: string;
@@ -34,13 +35,6 @@ interface CategorySpend {
     totalCents: number;
 }
 
-function formatCurrency(cents: number) {
-    return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-    }).format(cents / 100);
-}
-
 function formatMonth(ym: string) {
     const [y, m] = ym.split("-");
     const d = new Date(parseInt(y), parseInt(m) - 1);
@@ -57,6 +51,18 @@ export default function DashboardPage() {
     });
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [currency, setCurrency] = useState("USD");
+
+    // Fetch currency preference
+    useEffect(() => {
+        fetch("/api/user/currency")
+            .then((r) => r.json())
+            .then((data) => setCurrency(data.currency || "USD"))
+            .catch(() => { });
+    }, []);
+
+    const fmt = useCallback((cents: number) => formatCurrency(cents, currency), [currency]);
+    const symbol = getCurrencySymbol(currency);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -130,7 +136,7 @@ export default function DashboardPage() {
                                 className="category-tile"
                             >
                                 <div className="category-tile-name">{cat.name}</div>
-                                <div className="category-tile-amount">{formatCurrency(cat.totalCents)}</div>
+                                <div className="category-tile-amount">{fmt(cat.totalCents)}</div>
                             </Link>
                         ))}
                     </div>
@@ -142,25 +148,25 @@ export default function DashboardPage() {
                 <Link href={`/month/${selectedMonth}/spent`} className="summary-tile red">
                     <div className="summary-tile-label">🛒 Total Spent</div>
                     <div className="summary-tile-value">
-                        {loading ? "—" : formatCurrency(analytics?.totalCosts || 0)}
+                        {loading ? "—" : fmt(analytics?.totalCosts || 0)}
                     </div>
                 </Link>
                 <Link href={`/month/${selectedMonth}/income`} className="summary-tile green">
                     <div className="summary-tile-label">💵 Total Income</div>
                     <div className="summary-tile-value">
-                        {loading ? "—" : formatCurrency(analytics?.totalIncome || 0)}
+                        {loading ? "—" : fmt(analytics?.totalIncome || 0)}
                     </div>
                 </Link>
                 <div className="summary-tile blue">
                     <div className="summary-tile-label">📈 Net Income</div>
                     <div className="summary-tile-value">
-                        {loading ? "—" : formatCurrency(analytics?.netIncome || 0)}
+                        {loading ? "—" : fmt(analytics?.netIncome || 0)}
                     </div>
                 </div>
                 <div className="summary-tile amber">
                     <div className="summary-tile-label">📅 Avg Daily</div>
                     <div className="summary-tile-value">
-                        {loading ? "—" : formatCurrency(analytics?.avgDailySpend || 0)}
+                        {loading ? "—" : fmt(analytics?.avgDailySpend || 0)}
                     </div>
                 </div>
             </div>
@@ -177,7 +183,7 @@ export default function DashboardPage() {
                         <BarChart data={chartData} barGap={8}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                             <XAxis dataKey="name" stroke="#6b7280" fontSize={11} />
-                            <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => `$${v}`} />
+                            <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => `${symbol}${v}`} />
                             <Tooltip
                                 contentStyle={{
                                     background: "#1a1a2e",
@@ -186,7 +192,7 @@ export default function DashboardPage() {
                                     boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
                                     color: "#e8eaf6",
                                 }}
-                                formatter={(value: number | undefined) => [`$${(value ?? 0).toFixed(2)}`, undefined]}
+                                formatter={(value: number | undefined) => [`${symbol}${(value ?? 0).toFixed(2)}`, undefined]}
                             />
                             <Legend />
                             <Bar dataKey="Income" fill="#10b981" radius={[6, 6, 0, 0]} />
@@ -204,6 +210,7 @@ export default function DashboardPage() {
 
             {showModal && (
                 <TransactionModal
+                    currencySymbol={symbol}
                     onClose={() => setShowModal(false)}
                     onSaved={() => {
                         setShowModal(false);

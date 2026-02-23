@@ -11,6 +11,7 @@ interface Category {
 interface TransactionModalProps {
     onClose: () => void;
     onSaved: () => void;
+    currencySymbol?: string;
     editData?: {
         id: string;
         type: string;
@@ -21,7 +22,7 @@ interface TransactionModalProps {
     };
 }
 
-export default function TransactionModal({ onClose, onSaved, editData }: TransactionModalProps) {
+export default function TransactionModal({ onClose, onSaved, editData, currencySymbol = "$" }: TransactionModalProps) {
     const [type, setType] = useState(editData?.type || "COST");
     const [amount, setAmount] = useState(editData ? (editData.amountCents / 100).toString() : "");
     const [categoryId, setCategoryId] = useState(editData?.categoryId || "");
@@ -118,7 +119,7 @@ export default function TransactionModal({ onClose, onSaved, editData }: Transac
 
                     <div className="form-row">
                         <div className="form-group">
-                            <label>Amount ($)</label>
+                            <label>Amount ({currencySymbol})</label>
                             <input
                                 id="tx-amount"
                                 type="number"

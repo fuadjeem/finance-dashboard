@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
+import { CURRENCIES } from "@/lib/currency";
 
 interface Category {
     id: string;
     name: string;
     type: string;
-    active: boolean;
 }
 
 export default function SettingsPage() {
@@ -17,10 +17,43 @@ export default function SettingsPage() {
     const [editingName, setEditingName] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [currency, setCurrency] = useState("USD");
+    const [currencyLoading, setCurrencyLoading] = useState(true);
+    const [currencySaving, setCurrencySaving] = useState(false);
+
+    useEffect(() => {
+        fetch("/api/user/currency")
+            .then((r) => r.json())
+            .then((data) => setCurrency(data.currency || "USD"))
+            .catch(() => { })
+            .finally(() => setCurrencyLoading(false));
+    }, []);
+
+    const handleCurrencyChange = async (code: string) => {
+        setCurrencySaving(true);
+        const prev = currency;
+        setCurrency(code);
+        try {
+            const res = await fetch("/api/user/currency", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currency: code }),
+            });
+            if (!res.ok) {
+                setCurrency(prev);
+            } else {
+                setSuccess("Currency updated!");
+                setTimeout(() => setSuccess(""), 2000);
+            }
+        } catch {
+            setCurrency(prev);
+        }
+        setCurrencySaving(false);
+    };
 
     const fetchCategories = async () => {
         setLoading(true);
-        const res = await fetch(`/api/categories?type=${activeTab}&active=false`);
+        const res = await fetch(`/api/categories?type=${activeTab}`);
         const data = await res.json();
         setCategories(data);
         setLoading(false);
@@ -34,7 +67,6 @@ export default function SettingsPage() {
         e.preventDefault();
         setError("");
         setSuccess("");
-
         if (!newName.trim()) return;
 
         const res = await fetch("/api/categories", {
@@ -76,12 +108,20 @@ export default function SettingsPage() {
         fetchCategories();
     };
 
-    const handleToggleActive = async (id: string, currentActive: boolean) => {
-        await fetch(`/api/categories/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ active: !currentActive }),
-        });
+    const handleDelete = async (cat: Category) => {
+        if (cat.name === "Uncategorized") return;
+        if (!confirm(`Delete "${cat.name}"? Its transactions will move to Uncategorized.`)) return;
+        setError("");
+
+        const res = await fetch(`/api/categories/${cat.id}`, { method: "DELETE" });
+        if (!res.ok) {
+            const data = await res.json();
+            setError(data.error || "Failed to delete");
+            return;
+        }
+
+        setSuccess("Category deleted!");
+        setTimeout(() => setSuccess(""), 2000);
         fetchCategories();
     };
 
@@ -91,12 +131,38 @@ export default function SettingsPage() {
                 <h1>Settings</h1>
             </div>
 
+            {/* Currency Picker Card */}
+            <div className="card" style={{ marginBottom: 24 }}>
+                <div className="card-header">
+                    <h2 className="card-title">💱 Currency</h2>
+                </div>
+                {currencyLoading ? (
+                    <div className="skeleton" style={{ height: 48 }} />
+                ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                        <select
+                            className="form-input"
+                            style={{ width: "auto", minWidth: 280 }}
+                            value={currency}
+                            onChange={(e) => handleCurrencyChange(e.target.value)}
+                            disabled={currencySaving}
+                        >
+                            {CURRENCIES.map((c) => (
+                                <option key={c.code} value={c.code}>
+                                    {c.symbol} — {c.name} ({c.code})
+                                </option>
+                            ))}
+                        </select>
+                        {currencySaving && <span className="loading-spinner" style={{ width: 18, height: 18 }} />}
+                    </div>
+                )}
+            </div>
+
             <div className="card">
                 <div className="card-header">
                     <h2 className="card-title">Manage Categories</h2>
                 </div>
 
-                {/* Tabs */}
                 <div className="tabs">
                     <button
                         className={`tab ${activeTab === "COST" ? "active" : ""}`}
@@ -115,7 +181,6 @@ export default function SettingsPage() {
                 {error && <div className="error-msg">{error}</div>}
                 {success && <div className="success-msg">{success}</div>}
 
-                {/* Add form */}
                 <form className="add-category-form" onSubmit={handleAdd}>
                     <input
                         type="text"
@@ -129,13 +194,12 @@ export default function SettingsPage() {
                     </button>
                 </form>
 
-                {/* Category list */}
                 {loading ? (
                     <div className="skeleton" style={{ height: 200 }} />
                 ) : categories.length > 0 ? (
                     <div className="category-list">
                         {categories.map((cat) => (
-                            <div key={cat.id} className={`category-item ${!cat.active ? "inactive" : ""}`}>
+                            <div key={cat.id} className="category-item">
                                 {editingId === cat.id ? (
                                     <div className="inline-edit">
                                         <input
@@ -157,27 +221,29 @@ export default function SettingsPage() {
                                         </button>
                                     </div>
                                 ) : (
-                                    <span className="cat-name">
-                                        {cat.name}
-                                        {!cat.active && <span style={{ color: "var(--text-muted)", fontSize: 12, marginLeft: 8 }}>(inactive)</span>}
-                                    </span>
+                                    <span className="cat-name">{cat.name}</span>
                                 )}
 
                                 {editingId !== cat.id && (
                                     <div className="cat-actions">
-                                        <button
-                                            className="btn btn-ghost"
-                                            onClick={() => { setEditingId(cat.id); setEditingName(cat.name); }}
-                                        >
-                                            ✏️ Rename
-                                        </button>
-                                        <button
-                                            className={`btn ${cat.active ? "btn-danger" : "btn-success"}`}
-                                            style={{ padding: "6px 12px", fontSize: 12, border: cat.active ? undefined : "none" }}
-                                            onClick={() => handleToggleActive(cat.id, cat.active)}
-                                        >
-                                            {cat.active ? "Deactivate" : "Activate"}
-                                        </button>
+                                        {cat.name !== "Uncategorized" && (
+                                            <button
+                                                className="btn btn-ghost"
+                                                style={{ padding: "6px 12px", fontSize: 12 }}
+                                                onClick={() => { setEditingId(cat.id); setEditingName(cat.name); }}
+                                            >
+                                                ✏️ Rename
+                                            </button>
+                                        )}
+                                        {cat.name !== "Uncategorized" && (
+                                            <button
+                                                className="btn btn-danger"
+                                                style={{ padding: "6px 12px", fontSize: 12 }}
+                                                onClick={() => handleDelete(cat)}
+                                            >
+                                                🗑️ Delete
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>

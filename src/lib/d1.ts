@@ -43,6 +43,7 @@ interface User {
     name: string;
     email: string;
     passwordHash: string;
+    currency: string;
     createdAt: string;
 }
 
@@ -61,6 +62,17 @@ export async function createUser(data: { name: string; email: string; passwordHa
     return (await db.prepare("SELECT * FROM User WHERE id = ?").bind(id).first<User>())!;
 }
 
+export async function getUserCurrency(userId: string): Promise<string> {
+    const db = getDB();
+    const row = await db.prepare("SELECT currency FROM User WHERE id = ?").bind(userId).first<{ currency: string }>();
+    return row?.currency || "USD";
+}
+
+export async function updateUserCurrency(userId: string, currency: string): Promise<void> {
+    const db = getDB();
+    await db.prepare("UPDATE User SET currency = ? WHERE id = ?").bind(currency, userId).run();
+}
+
 // --- Category operations ---
 
 interface Category {
@@ -68,13 +80,12 @@ interface Category {
     userId: string;
     name: string;
     type: string;
-    active: number; // SQLite boolean
     createdAt: string;
 }
 
 export async function findCategories(
     userId: string,
-    opts?: { type?: string; activeOnly?: boolean }
+    opts?: { type?: string }
 ): Promise<Category[]> {
     const db = getDB();
     let sql = "SELECT * FROM Category WHERE userId = ?";
@@ -83,9 +94,6 @@ export async function findCategories(
     if (opts?.type) {
         sql += " AND type = ?";
         params.push(opts.type);
-    }
-    if (opts?.activeOnly !== false) {
-        sql += " AND active = 1";
     }
     sql += " ORDER BY name ASC";
 
@@ -159,6 +167,52 @@ export async function updateCategory(
     return (await db.prepare("SELECT * FROM Category WHERE id = ?").bind(id).first<Category>())!;
 }
 
+/**
+ * Get or create the "Uncategorized" category for a user and type.
+ * This is used as a fallback when a category is deleted.
+ */
+export async function getOrCreateUncategorized(userId: string, type: string): Promise<Category> {
+    const db = getDB();
+    const existing = await db
+        .prepare("SELECT * FROM Category WHERE userId = ? AND name = 'Uncategorized' AND type = ?")
+        .bind(userId, type)
+        .first<Category>();
+    if (existing) return existing;
+
+    const id = generateId();
+    await db
+        .prepare("INSERT INTO Category (id, userId, name, type, createdAt) VALUES (?, ?, 'Uncategorized', ?, datetime('now'))")
+        .bind(id, userId, type)
+        .run();
+    return (await db.prepare("SELECT * FROM Category WHERE id = ?").bind(id).first<Category>())!;
+}
+
+/**
+ * Delete a category and reassign its transactions to "Uncategorized".
+ */
+export async function deleteCategory(id: string, userId: string): Promise<void> {
+    const db = getDB();
+    const category = await findCategoryById(id, userId);
+    if (!category) return;
+
+    // Never allow deleting the Uncategorized category
+    if (category.name === "Uncategorized") {
+        throw new Error("Cannot delete the Uncategorized category");
+    }
+
+    // Get or create Uncategorized for this type
+    const uncategorized = await getOrCreateUncategorized(userId, category.type);
+
+    // Reassign all transactions from deleted category to Uncategorized
+    await db
+        .prepare('UPDATE "Transaction" SET categoryId = ? WHERE categoryId = ? AND userId = ?')
+        .bind(uncategorized.id, id, userId)
+        .run();
+
+    // Delete the category
+    await db.prepare("DELETE FROM Category WHERE id = ? AND userId = ?").bind(id, userId).run();
+}
+
 // --- Transaction operations ---
 
 interface Transaction {
@@ -169,6 +223,7 @@ interface Transaction {
     amountCents: number;
     date: string;
     note: string;
+    excluded: number; // SQLite boolean
     createdAt: string;
     categoryName?: string;
 }
@@ -287,6 +342,7 @@ export async function updateTransaction(
         categoryId?: string;
         date?: string;
         note?: string;
+        excluded?: boolean;
     }
 ): Promise<Transaction> {
     const db = getDB();
@@ -298,6 +354,7 @@ export async function updateTransaction(
     if (data.categoryId) { sets.push("categoryId = ?"); params.push(data.categoryId); }
     if (data.date) { sets.push("date = ?"); params.push(data.date); }
     if (data.note !== undefined) { sets.push("note = ?"); params.push(data.note); }
+    if (data.excluded !== undefined) { sets.push("excluded = ?"); params.push(data.excluded ? 1 : 0); }
 
     if (sets.length > 0) {
         params.push(id);
@@ -327,7 +384,7 @@ export async function findTransactionsForSummary(
     const db = getDB();
     const result = await db
         .prepare(
-            'SELECT type, amountCents, date FROM "Transaction" WHERE userId = ? AND date >= ? AND date <= ?'
+            'SELECT type, amountCents, date FROM "Transaction" WHERE userId = ? AND date >= ? AND date <= ? AND excluded = 0'
         )
         .bind(userId, startDate, endDate)
         .all<{ type: string; amountCents: number; date: string }>();
@@ -360,10 +417,10 @@ export async function findCategorySpending(
 
     const result = await db
         .prepare(
-            `SELECT c.id, c.name, c.type, COALESCE(SUM(t.amountCents), 0) as totalCents
+            `SELECT c.id, c.name, c.type, COALESCE(SUM(CASE WHEN t.excluded = 0 THEN t.amountCents ELSE 0 END), 0) as totalCents
              FROM Category c
              LEFT JOIN "Transaction" t ON t.categoryId = c.id AND t.date >= ? AND t.date <= ?
-             WHERE c.userId = ? AND c.active = 1
+             WHERE c.userId = ?
              GROUP BY c.id, c.name, c.type
              ORDER BY totalCents DESC`
         )

@@ -17,7 +17,7 @@ export async function PUT(
     }
 
     try {
-        const { type, amountCents, categoryId, date, note } = await req.json();
+        const { type, amountCents, categoryId, date, note, excluded } = await req.json();
 
         if (type && !["INCOME", "COST"].includes(type)) {
             return NextResponse.json({ error: "Type must be INCOME or COST" }, { status: 400 });
@@ -42,6 +42,7 @@ export async function PUT(
             categoryId,
             date,
             note,
+            excluded,
         });
 
         return NextResponse.json(transaction);

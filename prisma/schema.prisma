@@ -14,6 +14,7 @@ model User {
   name         String
   email        String        @unique
   passwordHash String
+  currency     String        @default("USD")
   createdAt    DateTime      @default(now())
   categories   Category[]
   transactions Transaction[]
@@ -24,7 +25,6 @@ model Category {
   userId       String
   name         String
   type         String        // "INCOME" or "COST"
-  active       Boolean       @default(true)
   createdAt    DateTime      @default(now())
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
@@ -40,6 +40,7 @@ model Transaction {
   amountCents Int     // stored as cents to avoid floating point
   date       String   // YYYY-MM-DD format for timezone safety
   note       String   @default("")
+  excluded   Boolean  @default(false)
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   category   Category @relation(fields: [categoryId], references: [id])

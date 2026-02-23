@@ -10,6 +10,7 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from "recharts";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 
 interface Transaction {
     id: string;
@@ -17,6 +18,8 @@ interface Transaction {
     amountCents: number;
     date: string;
     note: string;
+    excluded: boolean;
+    categoryId: string;
     category: { name: string };
 }
 
@@ -24,13 +27,6 @@ interface CategoryInfo {
     id: string;
     name: string;
     type: string;
-}
-
-function formatCurrency(cents: number) {
-    return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-    }).format(cents / 100);
 }
 
 export default function CategoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -47,7 +43,22 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
 
     const [category, setCategory] = useState<CategoryInfo | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [allCategories, setAllCategories] = useState<CategoryInfo[]>([]);
     const [loading, setLoading] = useState(true);
+    const [currency, setCurrency] = useState("USD");
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [reassignCatId, setReassignCatId] = useState("");
+    const [actionLoading, setActionLoading] = useState(false);
+
+    useEffect(() => {
+        fetch("/api/user/currency")
+            .then((r) => r.json())
+            .then((data) => setCurrency(data.currency || "USD"))
+            .catch(() => { });
+    }, []);
+
+    const fmt = useCallback((cents: number) => formatCurrency(cents, currency), [currency]);
+    const symbol = getCurrencySymbol(currency);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -56,29 +67,31 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
             const startDate = `${month}-01`;
             const endDate = `${y}-${String(m).padStart(2, "0")}-${new Date(y, m, 0).getDate()}`;
 
-            const res = await fetch(
-                `/api/transactions?categoryId=${id}&startDate=${startDate}&endDate=${endDate}&limit=200`
-            );
-            const data = await res.json();
-            setTransactions(data.transactions || []);
+            const [txRes, catRes] = await Promise.all([
+                fetch(`/api/transactions?categoryId=${id}&startDate=${startDate}&endDate=${endDate}&limit=200`),
+                fetch(`/api/categories`),
+            ]);
+            const txData = await txRes.json();
+            const catData = await catRes.json();
 
-            // Get category info from first transaction or from category API
-            if (data.transactions?.length > 0) {
+            setTransactions(txData.transactions || []);
+            setAllCategories(catData || []);
+
+            if (txData.transactions?.length > 0) {
                 setCategory({
                     id,
-                    name: data.transactions[0].category?.name || "Category",
-                    type: data.transactions[0].type || "COST",
+                    name: txData.transactions[0].category?.name || "Category",
+                    type: txData.transactions[0].type || "COST",
                 });
             } else {
-                const catRes = await fetch(`/api/categories`);
-                const cats = await catRes.json();
-                const found = cats.find((c: CategoryInfo) => c.id === id);
+                const found = catData.find((c: CategoryInfo) => c.id === id);
                 if (found) setCategory(found);
             }
         } catch (err) {
             console.error("Failed to fetch:", err);
         }
         setLoading(false);
+        setSelectedIds(new Set());
     }, [id, month]);
 
     useEffect(() => {
@@ -97,7 +110,64 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
         return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
     })();
 
-    // Build daily chart data
+    const toggleSelect = (txId: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(txId)) next.delete(txId);
+            else next.add(txId);
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === transactions.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(transactions.map((t) => t.id)));
+        }
+    };
+
+    const handleRecategorize = async () => {
+        if (!reassignCatId || selectedIds.size === 0) return;
+        setActionLoading(true);
+        try {
+            await Promise.all(
+                Array.from(selectedIds).map((txId) =>
+                    fetch(`/api/transactions/${txId}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ categoryId: reassignCatId }),
+                    })
+                )
+            );
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+        }
+        setActionLoading(false);
+    };
+
+    const handleToggleExclude = async (exclude: boolean) => {
+        if (selectedIds.size === 0) return;
+        setActionLoading(true);
+        try {
+            await Promise.all(
+                Array.from(selectedIds).map((txId) =>
+                    fetch(`/api/transactions/${txId}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ excluded: exclude }),
+                    })
+                )
+            );
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+        }
+        setActionLoading(false);
+    };
+
+    // Build daily chart data (only non-excluded)
     const dailyData = (() => {
         const [y, m] = month.split("-").map(Number);
         const daysInMonth = new Date(y, m, 0).getDate();
@@ -107,7 +177,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
             dayMap[key] = 0;
         }
         for (const tx of transactions) {
-            if (dayMap[tx.date] !== undefined) {
+            if (!tx.excluded && dayMap[tx.date] !== undefined) {
                 dayMap[tx.date] += tx.amountCents;
             }
         }
@@ -117,7 +187,8 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
         }));
     })();
 
-    const totalCents = transactions.reduce((sum, tx) => sum + tx.amountCents, 0);
+    const totalCents = transactions.filter((t) => !t.excluded).reduce((sum, tx) => sum + tx.amountCents, 0);
+    const sameTypeCategories = allCategories.filter((c) => c.type === (category?.type || "COST"));
 
     return (
         <div className="detail-page">
@@ -126,7 +197,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
                     ← Back
                 </button>
                 <h1>{category?.name || "Category"}</h1>
-                <div className="detail-total">{formatCurrency(totalCents)}</div>
+                <div className="detail-total">{fmt(totalCents)}</div>
             </div>
 
             <div className="month-selector" style={{ marginBottom: 20, justifyContent: "center" }}>
@@ -147,7 +218,7 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
                         <LineChart data={dailyData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                             <XAxis dataKey="day" stroke="#6b7280" fontSize={11} />
-                            <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => `$${v}`} />
+                            <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => `${symbol}${v}`} />
                             <Tooltip
                                 contentStyle={{
                                     background: "#1a1a2e",
@@ -155,20 +226,59 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
                                     borderRadius: 8,
                                     color: "#e8eaf6",
                                 }}
-                                formatter={(value: number | undefined) => [`$${(value ?? 0).toFixed(2)}`, "Spent"]}
+                                formatter={(value: number | undefined) => [`${symbol}${(value ?? 0).toFixed(2)}`, "Spent"]}
                             />
-                            <Line
-                                type="monotone"
-                                dataKey="amount"
-                                stroke="#f43f5e"
-                                strokeWidth={2}
-                                dot={false}
-                                activeDot={{ r: 4 }}
-                            />
+                            <Line type="monotone" dataKey="amount" stroke="#f43f5e" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                         </LineChart>
                     </ResponsiveContainer>
                 )}
             </div>
+
+            {/* Bulk actions bar */}
+            {selectedIds.size > 0 && (
+                <div className="card" style={{ marginBottom: 16, padding: 12 }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                            {selectedIds.size} selected
+                        </span>
+                        <select
+                            className="form-input"
+                            style={{ width: "auto", minWidth: 160, padding: "6px 10px", fontSize: 13 }}
+                            value={reassignCatId}
+                            onChange={(e) => setReassignCatId(e.target.value)}
+                        >
+                            <option value="">Move to category...</option>
+                            {sameTypeCategories.filter((c) => c.id !== id).map((c) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            className="btn btn-primary"
+                            style={{ padding: "6px 14px", fontSize: 13 }}
+                            disabled={!reassignCatId || actionLoading}
+                            onClick={handleRecategorize}
+                        >
+                            {actionLoading ? "..." : "Move"}
+                        </button>
+                        <button
+                            className="btn btn-secondary"
+                            style={{ padding: "6px 14px", fontSize: 13 }}
+                            disabled={actionLoading}
+                            onClick={() => handleToggleExclude(true)}
+                        >
+                            Exclude
+                        </button>
+                        <button
+                            className="btn btn-secondary"
+                            style={{ padding: "6px 14px", fontSize: 13 }}
+                            disabled={actionLoading}
+                            onClick={() => handleToggleExclude(false)}
+                        >
+                            Include
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Transaction table */}
             <div className="card">
@@ -180,6 +290,13 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
                         <table>
                             <thead>
                                 <tr>
+                                    <th style={{ width: 36 }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.size === transactions.length && transactions.length > 0}
+                                            onChange={toggleSelectAll}
+                                        />
+                                    </th>
                                     <th>Date</th>
                                     <th>Amount</th>
                                     <th>Note</th>
@@ -187,9 +304,25 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
                             </thead>
                             <tbody>
                                 {transactions.map((tx) => (
-                                    <tr key={tx.id}>
+                                    <tr
+                                        key={tx.id}
+                                        style={{
+                                            opacity: tx.excluded ? 0.5 : 1,
+                                            textDecoration: tx.excluded ? "line-through" : "none",
+                                        }}
+                                    >
+                                        <td>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.has(tx.id)}
+                                                onChange={() => toggleSelect(tx.id)}
+                                            />
+                                        </td>
                                         <td>{tx.date}</td>
-                                        <td className="amount-cost">{formatCurrency(tx.amountCents)}</td>
+                                        <td className="amount-cost">
+                                            {fmt(tx.amountCents)}
+                                            {tx.excluded && <span style={{ marginLeft: 6, fontSize: 10, color: "var(--text-muted)" }}>excluded</span>}
+                                        </td>
                                         <td style={{ color: "var(--text-muted)" }}>{tx.note || "—"}</td>
                                     </tr>
                                 ))}

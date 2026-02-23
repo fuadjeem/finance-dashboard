@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import TransactionModal from "@/components/TransactionModal";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 
 interface Transaction {
     id: string;
@@ -10,13 +11,6 @@ interface Transaction {
     date: string;
     note: string;
     category: { name: string };
-}
-
-function formatCurrency(cents: number) {
-    return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-    }).format(cents / 100);
 }
 
 export default function TransactionsPage() {
@@ -29,6 +23,17 @@ export default function TransactionsPage() {
     const [search, setSearch] = useState("");
     const [offset, setOffset] = useState(0);
     const limit = 20;
+    const [currency, setCurrency] = useState("USD");
+
+    useEffect(() => {
+        fetch("/api/user/currency")
+            .then((r) => r.json())
+            .then((data) => setCurrency(data.currency || "USD"))
+            .catch(() => { });
+    }, []);
+
+    const fmt = useCallback((cents: number) => formatCurrency(cents, currency), [currency]);
+    const symbol = getCurrencySymbol(currency);
 
     const fetchTransactions = useCallback(async () => {
         setLoading(true);
@@ -125,7 +130,7 @@ export default function TransactionsPage() {
                                             </td>
                                             <td><span className="category-badge">{tx.category.name}</span></td>
                                             <td className={tx.type === "INCOME" ? "amount-income" : "amount-cost"}>
-                                                {tx.type === "INCOME" ? "+" : "−"}{formatCurrency(tx.amountCents)}
+                                                {tx.type === "INCOME" ? "+" : "−"}{fmt(tx.amountCents)}
                                             </td>
                                             <td style={{ color: "var(--text-muted)" }}>{tx.note || "—"}</td>
                                             <td>
@@ -186,6 +191,7 @@ export default function TransactionsPage() {
 
             {showModal && (
                 <TransactionModal
+                    currencySymbol={symbol}
                     editData={editTx ? {
                         id: editTx.id,
                         type: editTx.type,

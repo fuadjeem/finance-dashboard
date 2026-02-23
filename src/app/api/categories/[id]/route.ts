@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findCategoryById, updateCategory } from "@/lib/d1";
+import { findCategoryById, updateCategory, deleteCategory } from "@/lib/d1";
 import { getSessionUser } from "@/lib/session";
 
 export async function PUT(
@@ -29,3 +29,30 @@ export async function PUT(
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
+export async function DELETE(
+    _req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { id } = await params;
+
+    const existing = await findCategoryById(id, user.id);
+    if (!existing) {
+        return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+
+    if (existing.name === "Uncategorized") {
+        return NextResponse.json({ error: "Cannot delete the Uncategorized category" }, { status: 400 });
+    }
+
+    try {
+        await deleteCategory(id, user.id);
+        return NextResponse.json({ success: true });
+    } catch {
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+}
+

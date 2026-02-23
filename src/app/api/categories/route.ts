@@ -8,9 +8,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type") || undefined;
-    const activeOnly = searchParams.get("active") !== "false";
 
-    const categories = await findCategories(user.id, { type, activeOnly });
+    const categories = await findCategories(user.id, { type });
     return NextResponse.json(categories);
 }
 
