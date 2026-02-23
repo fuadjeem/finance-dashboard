@@ -11,6 +11,7 @@ import {
     Legend,
 } from "recharts";
 import Link from "next/link";
+import TransactionModal from "@/components/TransactionModal";
 
 interface SummaryItem {
     month: string;
@@ -54,6 +55,7 @@ export default function DashboardPage() {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     });
+    const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(true);
 
     const fetchData = useCallback(async () => {
@@ -102,13 +104,18 @@ export default function DashboardPage() {
 
     return (
         <>
-            {/* Month selector header */}
+            {/* Header: Title + Month + Add Transaction */}
             <div className="page-header">
                 <h1>Dashboard</h1>
-                <div className="month-selector">
-                    <button onClick={() => navigateMonth(-1)} aria-label="Previous month">‹</button>
-                    <span className="current-month">{monthLabel}</span>
-                    <button onClick={() => navigateMonth(1)} aria-label="Next month">›</button>
+                <div className="page-header-actions">
+                    <div className="month-selector">
+                        <button onClick={() => navigateMonth(-1)} aria-label="Previous month">‹</button>
+                        <span className="current-month">{monthLabel}</span>
+                        <button onClick={() => navigateMonth(1)} aria-label="Next month">›</button>
+                    </div>
+                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                        + Add Transaction
+                    </button>
                 </div>
             </div>
 
@@ -133,29 +140,25 @@ export default function DashboardPage() {
             {/* Summary Tiles 2x2 */}
             <div className="summary-grid">
                 <Link href={`/month/${selectedMonth}/spent`} className="summary-tile red">
-                    <div className="summary-tile-icon">🛒</div>
-                    <div className="summary-tile-label">Total Spent</div>
+                    <div className="summary-tile-label">🛒 Total Spent</div>
                     <div className="summary-tile-value">
                         {loading ? "—" : formatCurrency(analytics?.totalCosts || 0)}
                     </div>
                 </Link>
                 <Link href={`/month/${selectedMonth}/income`} className="summary-tile green">
-                    <div className="summary-tile-icon">💵</div>
-                    <div className="summary-tile-label">Total Income</div>
+                    <div className="summary-tile-label">💵 Total Income</div>
                     <div className="summary-tile-value">
                         {loading ? "—" : formatCurrency(analytics?.totalIncome || 0)}
                     </div>
                 </Link>
                 <div className="summary-tile blue">
-                    <div className="summary-tile-icon">📈</div>
-                    <div className="summary-tile-label">Net Income</div>
+                    <div className="summary-tile-label">📈 Net Income</div>
                     <div className="summary-tile-value">
                         {loading ? "—" : formatCurrency(analytics?.netIncome || 0)}
                     </div>
                 </div>
                 <div className="summary-tile amber">
-                    <div className="summary-tile-icon">📅</div>
-                    <div className="summary-tile-label">Avg Daily Spend</div>
+                    <div className="summary-tile-label">📅 Avg Daily</div>
                     <div className="summary-tile-value">
                         {loading ? "—" : formatCurrency(analytics?.avgDailySpend || 0)}
                     </div>
@@ -168,13 +171,13 @@ export default function DashboardPage() {
                     <h2 className="card-title">Income vs Costs</h2>
                 </div>
                 {loading ? (
-                    <div className="skeleton" style={{ height: 250 }} />
+                    <div className="skeleton" style={{ height: 220 }} />
                 ) : chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
+                    <ResponsiveContainer width="100%" height={220}>
                         <BarChart data={chartData} barGap={8}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                            <XAxis dataKey="name" stroke="#6b7280" fontSize={12} />
-                            <YAxis stroke="#6b7280" fontSize={12} tickFormatter={(v) => `$${v}`} />
+                            <XAxis dataKey="name" stroke="#6b7280" fontSize={11} />
+                            <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => `$${v}`} />
                             <Tooltip
                                 contentStyle={{
                                     background: "#1a1a2e",
@@ -198,6 +201,16 @@ export default function DashboardPage() {
                     </div>
                 )}
             </div>
+
+            {showModal && (
+                <TransactionModal
+                    onClose={() => setShowModal(false)}
+                    onSaved={() => {
+                        setShowModal(false);
+                        fetchData();
+                    }}
+                />
+            )}
         </>
     );
 }
