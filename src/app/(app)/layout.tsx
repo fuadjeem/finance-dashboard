@@ -3,14 +3,12 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import TransactionModal from "@/components/TransactionModal";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const { data: session, status } = useSession();
     const router = useRouter();
     const pathname = usePathname();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
         if (status === "unauthenticated") {
@@ -40,7 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const bottomNavItems = [
         { href: "/dashboard", icon: "📊", label: "Home" },
         { href: "/transactions", icon: "💳", label: "Transactions" },
-        { href: "#add", icon: "+", label: "Add", isAction: true },
+        { href: "/settings", icon: "⚙️", label: "Settings" },
         { href: "/api/export/csv", icon: "📥", label: "Export", isExternal: true },
     ];
 
@@ -101,9 +99,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <span className="mobile-logo-text">FinanceFlow</span>
                 </div>
                 <div className="mobile-header-right">
-                    <Link href="/settings" className="mobile-header-btn" aria-label="Settings">
-                        ⚙️
-                    </Link>
                     <button
                         className="mobile-header-btn"
                         onClick={async () => {
@@ -122,17 +117,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Mobile bottom nav */}
             <nav className="bottom-nav">
                 {bottomNavItems.map((item) => {
-                    if (item.isAction) {
-                        return (
-                            <button
-                                key="add"
-                                className="bottom-nav-item bottom-nav-fab"
-                                onClick={() => setShowModal(true)}
-                            >
-                                <span className="bottom-nav-fab-icon">+</span>
-                            </button>
-                        );
-                    }
                     if (item.isExternal) {
                         return (
                             <a
@@ -166,16 +150,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
                 {sidebarOpen ? "✕" : "☰"}
             </button>
-
-            {showModal && (
-                <TransactionModal
-                    onClose={() => setShowModal(false)}
-                    onSaved={() => {
-                        setShowModal(false);
-                        router.refresh();
-                    }}
-                />
-            )}
         </div>
     );
 }

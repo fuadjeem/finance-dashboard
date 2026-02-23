@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         // Send email via Resend
         const resendKey = process.env.RESEND_API_KEY;
         if (resendKey) {
-            await fetch("https://api.resend.com/emails", {
+            const emailRes = await fetch("https://api.resend.com/emails", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
                 },
                 body: JSON.stringify({
                     from: "FinanceFlow <onboarding@resend.dev>",
-                    to: [email],
+                    to: email,
                     subject: "Reset your FinanceFlow password",
                     html: `
                         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
@@ -65,6 +65,15 @@ export async function POST(req: NextRequest) {
                     `,
                 }),
             });
+            const emailData = await emailRes.json();
+            console.log("Resend response:", emailRes.status, JSON.stringify(emailData));
+
+            if (!emailRes.ok) {
+                return NextResponse.json({
+                    message: "If an account with that email exists, a reset link has been sent.",
+                    debug: emailData
+                });
+            }
         }
 
         return NextResponse.json({ message: "If an account with that email exists, a reset link has been sent." });
