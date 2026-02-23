@@ -10,7 +10,7 @@ import {
     ResponsiveContainer,
     Legend,
 } from "recharts";
-import TransactionModal from "@/components/TransactionModal";
+import Link from "next/link";
 
 interface SummaryItem {
     month: string;
@@ -26,13 +26,11 @@ interface Analytics {
     currentMonth: string;
 }
 
-interface Transaction {
+interface CategorySpend {
     id: string;
+    name: string;
     type: string;
-    amountCents: number;
-    date: string;
-    note: string;
-    category: { name: string };
+    totalCents: number;
 }
 
 function formatCurrency(cents: number) {
@@ -51,28 +49,27 @@ function formatMonth(ym: string) {
 export default function DashboardPage() {
     const [summary, setSummary] = useState<SummaryItem[]>([]);
     const [analytics, setAnalytics] = useState<Analytics | null>(null);
-    const [recentCosts, setRecentCosts] = useState<Transaction[]>([]);
+    const [categorySpending, setCategorySpending] = useState<CategorySpend[]>([]);
     const [selectedMonth, setSelectedMonth] = useState(() => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     });
-    const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(true);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const [summaryRes, costsRes] = await Promise.all([
+            const [summaryRes, categoryRes] = await Promise.all([
                 fetch(`/api/transactions/summary?month=${selectedMonth}&months=6`),
-                fetch("/api/transactions?type=COST&limit=10"),
+                fetch(`/api/categories/spending?month=${selectedMonth}`),
             ]);
 
             const summaryData = await summaryRes.json();
-            const costsData = await costsRes.json();
+            const categoryData = await categoryRes.json();
 
             setSummary(summaryData.summary || []);
             setAnalytics(summaryData.analytics || null);
-            setRecentCosts(costsData.transactions || []);
+            setCategorySpending(categoryData || []);
         } catch (err) {
             console.error("Failed to fetch data:", err);
         }
@@ -101,49 +98,65 @@ export default function DashboardPage() {
         Costs: s.costs / 100,
     }));
 
+    const costCategories = categorySpending.filter((c) => c.type === "COST" && c.totalCents > 0);
+
     return (
         <>
+            {/* Month selector header */}
             <div className="page-header">
                 <h1>Dashboard</h1>
-                <div className="page-header-actions">
-                    <div className="month-selector">
-                        <button onClick={() => navigateMonth(-1)} aria-label="Previous month">‹</button>
-                        <span className="current-month">{monthLabel}</span>
-                        <button onClick={() => navigateMonth(1)} aria-label="Next month">›</button>
-                    </div>
-                    <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-                        + Add Transaction
-                    </button>
+                <div className="month-selector">
+                    <button onClick={() => navigateMonth(-1)} aria-label="Previous month">‹</button>
+                    <span className="current-month">{monthLabel}</span>
+                    <button onClick={() => navigateMonth(1)} aria-label="Next month">›</button>
                 </div>
             </div>
 
-            {/* Analytics Cards */}
-            <div className="analytics-grid">
-                <div className="analytics-card green">
-                    <div className="card-icon">💵</div>
-                    <div className="card-label">Total Income</div>
-                    <div className="card-value positive">
-                        {loading ? "—" : formatCurrency(analytics?.totalIncome || 0)}
+            {/* Swipeable Category Tiles */}
+            {costCategories.length > 0 && (
+                <div className="category-tiles-container">
+                    <div className="category-tiles-scroll">
+                        {costCategories.map((cat) => (
+                            <Link
+                                key={cat.id}
+                                href={`/category/${cat.id}?month=${selectedMonth}`}
+                                className="category-tile"
+                            >
+                                <div className="category-tile-name">{cat.name}</div>
+                                <div className="category-tile-amount">{formatCurrency(cat.totalCents)}</div>
+                            </Link>
+                        ))}
                     </div>
                 </div>
-                <div className="analytics-card red">
-                    <div className="card-icon">🛒</div>
-                    <div className="card-label">Total Costs</div>
-                    <div className="card-value negative">
+            )}
+
+            {/* Summary Tiles 2x2 */}
+            <div className="summary-grid">
+                <Link href={`/month/${selectedMonth}/spent`} className="summary-tile red">
+                    <div className="summary-tile-icon">🛒</div>
+                    <div className="summary-tile-label">Total Spent</div>
+                    <div className="summary-tile-value">
                         {loading ? "—" : formatCurrency(analytics?.totalCosts || 0)}
                     </div>
-                </div>
-                <div className="analytics-card blue">
-                    <div className="card-icon">📈</div>
-                    <div className="card-label">Net Income</div>
-                    <div className={`card-value ${(analytics?.netIncome || 0) >= 0 ? "positive" : "negative"}`}>
+                </Link>
+                <Link href={`/month/${selectedMonth}/income`} className="summary-tile green">
+                    <div className="summary-tile-icon">💵</div>
+                    <div className="summary-tile-label">Total Income</div>
+                    <div className="summary-tile-value">
+                        {loading ? "—" : formatCurrency(analytics?.totalIncome || 0)}
+                    </div>
+                </Link>
+                <div className="summary-tile blue">
+                    <div className="summary-tile-icon">📈</div>
+                    <div className="summary-tile-label">Net Income</div>
+                    <div className="summary-tile-value">
                         {loading ? "—" : formatCurrency(analytics?.netIncome || 0)}
                     </div>
                 </div>
-                <div className="analytics-card amber">
-                    <div className="card-icon">📅</div>
-                    <div className="card-label">Avg Daily Spend</div>
-                    <div className="card-value negative">
+                <div className="summary-tile amber">
+                    <div className="summary-tile-icon">📅</div>
+                    <div className="summary-tile-label">Avg Daily Spend</div>
+                    <div className="summary-tile-value">
                         {loading ? "—" : formatCurrency(analytics?.avgDailySpend || 0)}
                     </div>
                 </div>
@@ -155,9 +168,9 @@ export default function DashboardPage() {
                     <h2 className="card-title">Income vs Costs</h2>
                 </div>
                 {loading ? (
-                    <div className="skeleton" style={{ height: 300 }} />
+                    <div className="skeleton" style={{ height: 250 }} />
                 ) : chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
+                    <ResponsiveContainer width="100%" height={250}>
                         <BarChart data={chartData} barGap={8}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                             <XAxis dataKey="name" stroke="#6b7280" fontSize={12} />
@@ -185,53 +198,6 @@ export default function DashboardPage() {
                     </div>
                 )}
             </div>
-
-            {/* Recent Costs Table */}
-            <div className="card">
-                <div className="card-header">
-                    <h2 className="card-title">Latest 10 Costs</h2>
-                </div>
-                {recentCosts.length > 0 ? (
-                    <div className="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Category</th>
-                                    <th>Amount</th>
-                                    <th>Note</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {recentCosts.map((tx) => (
-                                    <tr key={tx.id}>
-                                        <td>{tx.date}</td>
-                                        <td><span className="category-badge">{tx.category.name}</span></td>
-                                        <td className="amount-cost">{formatCurrency(tx.amountCents)}</td>
-                                        <td style={{ color: "var(--text-muted)" }}>{tx.note || "—"}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <div className="empty-state">
-                        <div className="icon">🧾</div>
-                        <h3>No costs recorded</h3>
-                        <p>Your latest costs will appear here</p>
-                    </div>
-                )}
-            </div>
-
-            {showModal && (
-                <TransactionModal
-                    onClose={() => setShowModal(false)}
-                    onSaved={() => {
-                        setShowModal(false);
-                        fetchData();
-                    }}
-                />
-            )}
         </>
     );
 }

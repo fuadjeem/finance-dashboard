@@ -75,6 +75,10 @@ export default function LoginPage() {
                     </button>
                 </form>
 
+                <div className="auth-link" style={{ marginTop: 12 }}>
+                    <Link href="/forgot-password">Forgot your password?</Link>
+                </div>
+
                 <div className="auth-link">
                     Don&apos;t have an account? <Link href="/signup">Sign up</Link>
                 </div>

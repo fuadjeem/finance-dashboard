@@ -346,3 +346,88 @@ export async function findTransactionsForExport(
         .all<{ date: string; type: string; categoryName: string; amountCents: number; note: string }>();
     return result.results;
 }
+
+// --- Category spending aggregation ---
+
+export async function findCategorySpending(
+    userId: string,
+    month: string // YYYY-MM
+): Promise<{ id: string; name: string; type: string; totalCents: number }[]> {
+    const db = getDB();
+    const startDate = `${month}-01`;
+    const [y, m] = month.split("-").map(Number);
+    const endDate = `${y}-${String(m).padStart(2, "0")}-${new Date(y, m, 0).getDate()}`;
+
+    const result = await db
+        .prepare(
+            `SELECT c.id, c.name, c.type, COALESCE(SUM(t.amountCents), 0) as totalCents
+             FROM Category c
+             LEFT JOIN "Transaction" t ON t.categoryId = c.id AND t.date >= ? AND t.date <= ?
+             WHERE c.userId = ? AND c.active = 1
+             GROUP BY c.id, c.name, c.type
+             ORDER BY totalCents DESC`
+        )
+        .bind(startDate, endDate, userId)
+        .all<{ id: string; name: string; type: string; totalCents: number }>();
+    return result.results;
+}
+
+export async function findTransactionsByCategory(
+    userId: string,
+    categoryId: string,
+    month: string // YYYY-MM
+): Promise<Transaction[]> {
+    const db = getDB();
+    const startDate = `${month}-01`;
+    const [y, m] = month.split("-").map(Number);
+    const endDate = `${y}-${String(m).padStart(2, "0")}-${new Date(y, m, 0).getDate()}`;
+
+    const result = await db
+        .prepare(
+            `SELECT t.*, c.name as categoryName FROM "Transaction" t
+             LEFT JOIN Category c ON t.categoryId = c.id
+             WHERE t.userId = ? AND t.categoryId = ? AND t.date >= ? AND t.date <= ?
+             ORDER BY t.date DESC, t.createdAt DESC`
+        )
+        .bind(userId, categoryId, startDate, endDate)
+        .all<Transaction>();
+
+    return result.results.map((t) => ({
+        ...t,
+        category: { name: t.categoryName || "" },
+    })) as unknown as Transaction[];
+}
+
+export async function findCategoryByIdOnly(id: string): Promise<{ id: string; name: string; type: string; userId: string } | null> {
+    const db = getDB();
+    return db.prepare("SELECT id, name, type, userId FROM Category WHERE id = ?").bind(id).first();
+}
+
+// --- Password reset ---
+
+export async function createPasswordResetToken(userId: string, token: string, expiresAt: string): Promise<void> {
+    const db = getDB();
+    const id = generateId();
+    // Delete any existing tokens for this user first
+    await db.prepare("DELETE FROM PasswordReset WHERE userId = ?").bind(userId).run();
+    await db
+        .prepare("INSERT INTO PasswordReset (id, userId, token, expiresAt, createdAt) VALUES (?, ?, ?, ?, datetime('now'))")
+        .bind(id, userId, token, expiresAt)
+        .run();
+}
+
+export async function findPasswordResetToken(token: string): Promise<{ id: string; userId: string; token: string; expiresAt: string } | null> {
+    const db = getDB();
+    return db.prepare("SELECT * FROM PasswordReset WHERE token = ?").bind(token).first();
+}
+
+export async function deletePasswordResetToken(id: string): Promise<void> {
+    const db = getDB();
+    await db.prepare("DELETE FROM PasswordReset WHERE id = ?").bind(id).run();
+}
+
+export async function updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+    const db = getDB();
+    await db.prepare("UPDATE User SET passwordHash = ? WHERE id = ?").bind(passwordHash, userId).run();
+}
+
