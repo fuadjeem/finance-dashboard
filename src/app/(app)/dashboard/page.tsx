@@ -62,7 +62,7 @@ export default function DashboardPage() {
         setLoading(true);
         try {
             const [summaryRes, categoryRes] = await Promise.all([
-                fetch(`/api/transactions/summary?month=${selectedMonth}&months=6`),
+                fetch(`/api/transactions/summary?month=${selectedMonth}&months=4`),
                 fetch(`/api/categories/spending?month=${selectedMonth}`),
             ]);
 
@@ -171,9 +171,9 @@ export default function DashboardPage() {
                     <h2 className="card-title">Income vs Costs</h2>
                 </div>
                 {loading ? (
-                    <div className="skeleton" style={{ height: 220 }} />
+                    <div className="skeleton" style={{ height: 180 }} />
                 ) : chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={220}>
+                    <ResponsiveContainer width="100%" height={180}>
                         <BarChart data={chartData} barGap={8}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                             <XAxis dataKey="name" stroke="#6b7280" fontSize={11} />
