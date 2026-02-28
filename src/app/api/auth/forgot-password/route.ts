@@ -43,24 +43,35 @@ export async function POST(req: NextRequest) {
                     Authorization: `Bearer ${resendKey}`,
                 },
                 body: JSON.stringify({
-                    from: "FinanceFlow <onboarding@resend.dev>",
+                    from: "FinanceFlow <noreply@jprojects.cc>",
                     to: email,
                     subject: "Reset your FinanceFlow password",
                     html: `
-                        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-                            <h2 style="color: #333;">Reset your password</h2>
-                            <p style="color: #666; line-height: 1.6;">
-                                You requested a password reset for your FinanceFlow account.
-                                Click the button below to set a new password. This link expires in 1 hour.
-                            </p>
-                            <a href="${resetUrl}"
-                               style="display: inline-block; background: #6366f1; color: white; padding: 14px 28px;
-                                      border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">
-                                Reset Password
-                            </a>
-                            <p style="color: #999; font-size: 13px;">
-                                If you didn't request this, you can safely ignore this email.
-                            </p>
+                        <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f6f9fc; padding: 40px 0;">
+                            <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+                                <div style="text-align: center; margin-bottom: 30px;">
+                                    <h1 style="color: #111827; font-size: 24px; font-weight: 700; margin: 0;">FinanceFlow</h1>
+                                </div>
+                                <h2 style="color: #1f2937; font-size: 20px; font-weight: 600; margin-top: 0; margin-bottom: 16px;">Reset your password</h2>
+                                <p style="color: #4b5563; line-height: 1.6; font-size: 15px; margin-bottom: 24px;">
+                                    We received a request to reset the password for your FinanceFlow account. Click the button below to set up a new password. This link will safely expire in 1 hour.
+                                </p>
+                                <div style="text-align: center; margin: 32px 0;">
+                                    <a href="${resetUrl}"
+                                       style="display: inline-block; background-color: #4f46e5; color: #ffffff; padding: 14px 32px;
+                                              border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;
+                                              box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); transition: background-color 0.2s;">
+                                        Reset Password
+                                    </a>
+                                </div>
+                                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;" />
+                                <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 0;">
+                                    If you didn't request a password reset, you can safely ignore this email. Your password won't be changed until you click the link above and create a new one.
+                                </p>
+                            </div>
+                            <div style="text-align: center; margin-top: 24px;">
+                                <p style="color: #9ca3af; font-size: 12px;">© ${new Date().getFullYear()} FinanceFlow. All rights reserved.</p>
+                            </div>
                         </div>
                     `,
                 }),
