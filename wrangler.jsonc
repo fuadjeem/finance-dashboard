@@ -10,6 +10,12 @@
 		"directory": ".open-next/assets",
 		"binding": "ASSETS"
 	},
+	"routes": [
+		{
+			"pattern": "finance.jprojects.cc",
+			"custom_domain": true
+		}
+	],
 	// D1 database binding — update database_id after running:
 	// npx wrangler d1 create finance-dashboard-db
 	"d1_databases": [
