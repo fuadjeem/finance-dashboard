@@ -1,15 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withSpring,
-    withTiming,
-    runOnJS,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef, useState } from 'react';
+import { StyleSheet, Text, View, Animated } from 'react-native';
 import { AlertCircle, CheckCircle, Info } from 'lucide-react-native';
 import { tokens } from '../tokens';
-import { motion } from '../motion';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -23,36 +15,27 @@ interface ToastProps {
 
 export const Toast = ({ message, type = 'info', duration = 3000, onDismiss, visible }: ToastProps) => {
     const [show, setShow] = useState(visible);
-    const translateY = useSharedValue(100);
+    const translateY = useRef(new Animated.Value(100)).current;
+
+    const hideToast = () => {
+        Animated.timing(translateY, { toValue: 100, duration: 250, useNativeDriver: true }).start(() => {
+            setShow(false);
+            onDismiss?.();
+        });
+    };
 
     useEffect(() => {
         if (visible) {
             setShow(true);
-            translateY.value = withSpring(0, motion.toastSpringConfig);
-
+            Animated.spring(translateY, { toValue: 0, damping: 15, stiffness: 150, mass: 1, useNativeDriver: true }).start();
             if (duration > 0) {
-                const timer = setTimeout(() => {
-                    hideToast();
-                }, duration);
-                return () => clearTimeout(timer);
+                const t = setTimeout(hideToast, duration);
+                return () => clearTimeout(t);
             }
         } else {
             hideToast();
         }
     }, [visible]);
-
-    const hideToast = () => {
-        translateY.value = withTiming(100, { duration: 250 }, (finished) => {
-            if (finished) {
-                runOnJS(setShow)(false);
-                if (onDismiss) runOnJS(onDismiss)();
-            }
-        });
-    };
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: translateY.value }],
-    }));
 
     if (!show) return null;
 
@@ -73,7 +56,7 @@ export const Toast = ({ message, type = 'info', duration = 3000, onDismiss, visi
     };
 
     return (
-        <Animated.View style={[styles.container, animatedStyle, { borderLeftColor: getBorderColor() }]}>
+        <Animated.View style={[styles.container, { transform: [{ translateY }], borderLeftColor: getBorderColor() }]}>
             <View style={styles.iconContainer}>{getIcon()}</View>
             <Text style={styles.message}>{message}</Text>
         </Animated.View>
@@ -95,9 +78,7 @@ const styles = StyleSheet.create({
         ...tokens.shadows.lg,
         zIndex: 1000,
     },
-    iconContainer: {
-        marginRight: tokens.spacing.sm,
-    },
+    iconContainer: { marginRight: tokens.spacing.sm },
     message: {
         flex: 1,
         fontFamily: tokens.typography.fontFamily,

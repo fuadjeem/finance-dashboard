@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '../hooks/useAuth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -16,15 +16,25 @@ function InitialLayout() {
         const inAuthGroup = segments[0] === '(auth)';
 
         if (!user && !inAuthGroup) {
-            // Redirect to login if not logged in
             router.replace('/login');
         } else if (user && inAuthGroup) {
-            // Redirect to dashboard if logged in and trying to view auth screens
             router.replace('/(tabs)');
         }
     }, [user, loading, segments]);
 
-    return <Slot />;
+    return (
+        <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+                name="category/[id]"
+                options={{
+                    headerShown: true,
+                    headerTitle: 'Category Detail',
+                    headerBackTitle: 'Back',
+                }}
+            />
+        </Stack>
+    );
 }
 
 export default function RootLayout() {

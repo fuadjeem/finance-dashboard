@@ -1,14 +1,6 @@
-import React, { useEffect } from 'react';
-import { ViewStyle, StyleSheet } from 'react-native';
-import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withRepeat,
-    withTiming,
-    withSequence,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { Animated, ViewStyle, StyleSheet } from 'react-native';
 import { tokens } from '../tokens';
-import { motion } from '../motion';
 
 interface SkeletonProps {
     width?: number | string;
@@ -23,22 +15,16 @@ export const Skeleton = ({
     borderRadius = tokens.radii.sm,
     style,
 }: SkeletonProps) => {
-    const opacity = useSharedValue(0.3);
+    const opacity = useRef(new Animated.Value(0.3)).current;
 
     useEffect(() => {
-        opacity.value = withRepeat(
-            withSequence(
-                withTiming(0.7, { duration: motion.skeletonShimmerDuration / 2 }),
-                withTiming(0.3, { duration: motion.skeletonShimmerDuration / 2 })
-            ),
-            -1,
-            true
-        );
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(opacity, { toValue: 0.7, duration: 500, useNativeDriver: true }),
+                Animated.timing(opacity, { toValue: 0.3, duration: 500, useNativeDriver: true }),
+            ])
+        ).start();
     }, [opacity]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-    }));
 
     return (
         <Animated.View
@@ -48,8 +34,8 @@ export const Skeleton = ({
                     width: width as any,
                     height: height as any,
                     borderRadius,
+                    opacity,
                 },
-                animatedStyle,
                 style,
             ]}
         />

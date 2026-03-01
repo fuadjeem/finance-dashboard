@@ -1,88 +1,52 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, Pressable, Dimensions } from 'react-native';
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withSpring,
-    withTiming,
-    runOnJS,
-} from 'react-native-reanimated';
-import { PanGestureHandler, PanGestureHandlerEventPayload, HandlerStateChangeEvent } from 'react-native-gesture-handler';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, Pressable, Dimensions, Animated, View } from 'react-native';
 import { tokens } from '../tokens';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const MAX_TRANSLATE_Y = SCREEN_HEIGHT;
 
 interface BottomSheetProps {
     visible: boolean;
     onClose: () => void;
     children: React.ReactNode;
-    snapPoints?: string[]; // e.g. ['50%', '90%']
+    snapPoints?: string[];
 }
 
 export const BottomSheet = ({ visible, onClose, children, snapPoints = ['50%'] }: BottomSheetProps) => {
-    const translateY = useSharedValue(MAX_TRANSLATE_Y);
-    const opacity = useSharedValue(0);
+    const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+    const opacity = useRef(new Animated.Value(0)).current;
 
     const defaultHeight = (parseFloat(snapPoints[0]) / 100) * SCREEN_HEIGHT;
+    const defaultTranslateY = SCREEN_HEIGHT - defaultHeight;
+
+    const closeSheet = () => {
+        Animated.parallel([
+            Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+            Animated.timing(translateY, { toValue: SCREEN_HEIGHT, duration: 250, useNativeDriver: true }),
+        ]).start(onClose);
+    };
 
     useEffect(() => {
         if (visible) {
-            opacity.value = withTiming(1, { duration: 300 });
-            translateY.value = withSpring(SCREEN_HEIGHT - defaultHeight, {
-                damping: 15,
-                stiffness: 150,
-            });
+            Animated.parallel([
+                Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+                Animated.spring(translateY, { toValue: defaultTranslateY, damping: 15, stiffness: 150, useNativeDriver: true }),
+            ]).start();
         } else {
-            opacity.value = withTiming(0, { duration: 250 });
-            translateY.value = withTiming(MAX_TRANSLATE_Y, { duration: 250 }, (finished) => {
-                if (finished) runOnJS(onClose)();
-            });
+            closeSheet();
         }
     }, [visible]);
-
-    const closeSheet = () => {
-        opacity.value = withTiming(0, { duration: 250 });
-        translateY.value = withTiming(MAX_TRANSLATE_Y, { duration: 250 }, (finished) => {
-            if (finished) runOnJS(onClose)();
-        });
-    };
-
-    const backdropStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-        pointerEvents: visible ? 'auto' : 'none',
-    }));
-
-    const sheetStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: translateY.value }],
-    }));
 
     if (!visible) return null;
 
     return (
         <>
-            <Animated.View style={[styles.backdrop, backdropStyle]}>
+            <Animated.View style={[styles.backdrop, { opacity }]}>
                 <Pressable style={styles.backdropPressable} onPress={closeSheet} />
             </Animated.View>
-            <Animated.View style={[styles.sheet, sheetStyle, { height: defaultHeight }]}>
-                <PanGestureHandler
-                    onGestureEvent={((e: { nativeEvent: PanGestureHandlerEventPayload }) => {
-                        if (e.nativeEvent.translationY > 0) {
-                            translateY.value = SCREEN_HEIGHT - defaultHeight + e.nativeEvent.translationY;
-                        }
-                    }) as any}
-                    onEnded={((e: any) => {
-                        if (e.nativeEvent.translationY > 50 || e.nativeEvent.velocityY > 500) {
-                            runOnJS(closeSheet)();
-                        } else {
-                            translateY.value = withSpring(SCREEN_HEIGHT - defaultHeight);
-                        }
-                    }) as any}
-                >
-                    <Animated.View style={styles.handleContainer}>
-                        <Animated.View style={styles.handle} />
-                    </Animated.View>
-                </PanGestureHandler>
+            <Animated.View style={[styles.sheet, { height: defaultHeight, transform: [{ translateY }] }]}>
+                <View style={styles.handleContainer}>
+                    <View style={styles.handle} />
+                </View>
                 {children}
             </Animated.View>
         </>
@@ -95,9 +59,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.4)',
         zIndex: 100,
     },
-    backdropPressable: {
-        flex: 1,
-    },
+    backdropPressable: { flex: 1 },
     sheet: {
         position: 'absolute',
         left: 0,
@@ -109,14 +71,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: tokens.spacing.lg,
         paddingBottom: 40,
     },
-    handleContainer: {
-        alignItems: 'center',
-        paddingVertical: tokens.spacing.md,
-    },
-    handle: {
-        width: 40,
-        height: 5,
-        borderRadius: tokens.radii.full,
-        backgroundColor: '#d1d5db',
-    },
+    handleContainer: { alignItems: 'center', paddingVertical: tokens.spacing.md },
+    handle: { width: 40, height: 5, borderRadius: tokens.radii.full, backgroundColor: '#d1d5db' },
 });

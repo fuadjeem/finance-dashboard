@@ -12,6 +12,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "com.fuadjeem.financedashboard",
       "supportsTablet": true
     },
     "android": {

@@ -1,6 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, Text, Pressable, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import React, { useRef } from 'react';
+import { Animated, ActivityIndicator, Text, Pressable, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { tokens } from '../tokens';
 import { motion } from '../motion';
@@ -19,8 +18,6 @@ interface ButtonProps {
     textStyle?: StyleProp<TextStyle>;
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 export const Button = ({
     label,
     variant = 'primary',
@@ -31,21 +28,15 @@ export const Button = ({
     style,
     textStyle,
 }: ButtonProps) => {
-    const scale = useSharedValue(1);
-
-    const animatedStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ scale: scale.value }],
-        };
-    });
+    const scale = useRef(new Animated.Value(1)).current;
 
     const handlePressIn = () => {
         if (disabled || loading) return;
-        scale.value = withTiming(motion.buttonScaleDown, motion.buttonPressConfig);
+        Animated.timing(scale, { toValue: motion.buttonScaleDown, ...motion.buttonPressConfig }).start();
     };
 
     const handlePressOut = () => {
-        scale.value = withTiming(1, motion.buttonPressConfig);
+        Animated.timing(scale, { toValue: 1, ...motion.buttonPressConfig }).start();
     };
 
     const handlePress = () => {
@@ -79,28 +70,28 @@ export const Button = ({
     };
 
     return (
-        <AnimatedPressable
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            onPress={handlePress}
-            disabled={disabled || loading}
-            style={[
-                styles.baseContainer,
-                getContainerStyle(),
-                getSizeStyle(),
-                (disabled || loading) && styles.disabledContainer,
-                animatedStyle,
-                style,
-            ]}
-        >
-            {loading ? (
-                <ActivityIndicator color={variant === 'primary' ? 'white' : tokens.colors.brand.primary} />
-            ) : (
-                <Text style={[styles.baseText, getTextStyle(), disabled && styles.disabledText, textStyle]}>
-                    {label}
-                </Text>
-            )}
-        </AnimatedPressable>
+        <Animated.View style={[{ transform: [{ scale }] }, style]}>
+            <Pressable
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                onPress={handlePress}
+                disabled={disabled || loading}
+                style={[
+                    styles.baseContainer,
+                    getContainerStyle(),
+                    getSizeStyle(),
+                    (disabled || loading) && styles.disabledContainer,
+                ]}
+            >
+                {loading ? (
+                    <ActivityIndicator color={variant === 'primary' ? 'white' : tokens.colors.brand.primary} />
+                ) : (
+                    <Text style={[styles.baseText, getTextStyle(), disabled && styles.disabledText, textStyle]}>
+                        {label}
+                    </Text>
+                )}
+            </Pressable>
+        </Animated.View>
     );
 };
 
