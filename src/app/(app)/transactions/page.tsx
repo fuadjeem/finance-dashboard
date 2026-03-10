@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import TransactionModal from "@/components/TransactionModal";
-import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 interface Transaction {
     id: string;
@@ -23,17 +23,7 @@ export default function TransactionsPage() {
     const [search, setSearch] = useState("");
     const [offset, setOffset] = useState(0);
     const limit = 20;
-    const [currency, setCurrency] = useState("USD");
-
-    useEffect(() => {
-        fetch("/api/user/currency")
-            .then((r) => r.json())
-            .then((data) => setCurrency(data.currency || "USD"))
-            .catch(() => { });
-    }, []);
-
-    const fmt = useCallback((cents: number) => formatCurrency(cents, currency), [currency]);
-    const symbol = getCurrencySymbol(currency);
+    const { fmt } = useCurrency();
 
     const fetchTransactions = useCallback(async () => {
         setLoading(true);
@@ -191,7 +181,6 @@ export default function TransactionsPage() {
 
             {showModal && (
                 <TransactionModal
-                    currencySymbol={symbol}
                     editData={editTx ? {
                         id: editTx.id,
                         type: editTx.type,

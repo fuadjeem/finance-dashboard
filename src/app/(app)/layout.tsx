@@ -3,6 +3,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { CurrencyProvider } from "@/components/CurrencyProvider";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const { data: session, status } = useSession();
@@ -43,6 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ];
 
     return (
+        <CurrencyProvider>
         <div className="app-layout">
             {/* Desktop sidebar */}
             <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
@@ -151,5 +153,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {sidebarOpen ? "✕" : "☰"}
             </button>
         </div>
+        </CurrencyProvider>
     );
 }

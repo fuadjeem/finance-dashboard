@@ -95,7 +95,10 @@ export default function AddTransactionModal({ visible, onClose, onSaved, editDat
                             {(['COST', 'INCOME'] as const).map((t) => (
                                 <TouchableOpacity
                                     key={t}
-                                    style={[styles.typeChip, type === t && styles.typeChipActive(t)]}
+                                    style={[styles.typeChip, type === t && {
+                                        borderColor: t === 'COST' ? tokens.colors.semantic.error : tokens.colors.semantic.success,
+                                        backgroundColor: t === 'COST' ? '#fef2f2' : '#f0fdf4',
+                                    }]}
                                     onPress={() => { setType(t); setCategoryId(''); }}
                                 >
                                     <Text style={[styles.typeChipText, type === t && styles.typeChipTextActive]}>
@@ -210,10 +213,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: tokens.colors.bg.surface,
     },
-    typeChipActive: (t: string) => ({
-        borderColor: t === 'COST' ? tokens.colors.semantic.error : tokens.colors.semantic.success,
-        backgroundColor: t === 'COST' ? '#fef2f2' : '#f0fdf4',
-    }),
+
     typeChipText: {
         fontFamily: tokens.typography.fontFamily,
         fontSize: 14,

@@ -10,7 +10,7 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from "recharts";
-import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 interface Transaction {
     id: string;
@@ -45,20 +45,10 @@ export default function CategoryDetailPage({ params }: { params: Promise<{ id: s
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [allCategories, setAllCategories] = useState<CategoryInfo[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currency, setCurrency] = useState("USD");
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [reassignCatId, setReassignCatId] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
-
-    useEffect(() => {
-        fetch("/api/user/currency")
-            .then((r) => r.json())
-            .then((data) => setCurrency(data.currency || "USD"))
-            .catch(() => { });
-    }, []);
-
-    const fmt = useCallback((cents: number) => formatCurrency(cents, currency), [currency]);
-    const symbol = getCurrencySymbol(currency);
+    const { fmt, symbol } = useCurrency();
 
     const fetchData = useCallback(async () => {
         setLoading(true);

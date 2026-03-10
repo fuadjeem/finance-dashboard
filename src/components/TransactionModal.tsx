@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 interface Category {
     id: string;
@@ -11,7 +12,6 @@ interface Category {
 interface TransactionModalProps {
     onClose: () => void;
     onSaved: () => void;
-    currencySymbol?: string;
     editData?: {
         id: string;
         type: string;
@@ -22,7 +22,8 @@ interface TransactionModalProps {
     };
 }
 
-export default function TransactionModal({ onClose, onSaved, editData, currencySymbol = "$" }: TransactionModalProps) {
+export default function TransactionModal({ onClose, onSaved, editData }: TransactionModalProps) {
+    const { symbol: currencySymbol } = useCurrency();
     const [type, setType] = useState(editData?.type || "COST");
     const [amount, setAmount] = useState(editData ? (editData.amountCents / 100).toString() : "");
     const [categoryId, setCategoryId] = useState(editData?.categoryId || "");

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { CURRENCIES } from "@/lib/currency";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 interface Category {
     id: string;
@@ -17,36 +18,15 @@ export default function SettingsPage() {
     const [editingName, setEditingName] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
-    const [currency, setCurrency] = useState("USD");
-    const [currencyLoading, setCurrencyLoading] = useState(true);
+    const { currency, loading: currencyLoading, updateCurrency } = useCurrency();
     const [currencySaving, setCurrencySaving] = useState(false);
-
-    useEffect(() => {
-        fetch("/api/user/currency")
-            .then((r) => r.json())
-            .then((data) => setCurrency(data.currency || "USD"))
-            .catch(() => { })
-            .finally(() => setCurrencyLoading(false));
-    }, []);
 
     const handleCurrencyChange = async (code: string) => {
         setCurrencySaving(true);
-        const prev = currency;
-        setCurrency(code);
-        try {
-            const res = await fetch("/api/user/currency", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ currency: code }),
-            });
-            if (!res.ok) {
-                setCurrency(prev);
-            } else {
-                setSuccess("Currency updated!");
-                setTimeout(() => setSuccess(""), 2000);
-            }
-        } catch {
-            setCurrency(prev);
+        const ok = await updateCurrency(code);
+        if (ok) {
+            setSuccess("Currency updated!");
+            setTimeout(() => setSuccess(""), 2000);
         }
         setCurrencySaving(false);
     };

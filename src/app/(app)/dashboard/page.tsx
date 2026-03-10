@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import Link from "next/link";
 import TransactionModal from "@/components/TransactionModal";
-import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 interface SummaryItem {
     month: string;
@@ -51,18 +51,7 @@ export default function DashboardPage() {
     });
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [currency, setCurrency] = useState("USD");
-
-    // Fetch currency preference
-    useEffect(() => {
-        fetch("/api/user/currency")
-            .then((r) => r.json())
-            .then((data) => setCurrency(data.currency || "USD"))
-            .catch(() => { });
-    }, []);
-
-    const fmt = useCallback((cents: number) => formatCurrency(cents, currency), [currency]);
-    const symbol = getCurrencySymbol(currency);
+    const { fmt, symbol } = useCurrency();
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -210,7 +199,6 @@ export default function DashboardPage() {
 
             {showModal && (
                 <TransactionModal
-                    currencySymbol={symbol}
                     onClose={() => setShowModal(false)}
                     onSaved={() => {
                         setShowModal(false);

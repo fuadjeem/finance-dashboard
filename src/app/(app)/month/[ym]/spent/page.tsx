@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatCurrency } from "@/lib/currency";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 interface CategorySpend {
     id: string;
@@ -34,7 +34,6 @@ export default function SpentDetailPage({ params }: { params: Promise<{ ym: stri
     const [month, setMonth] = useState(ym);
     const [categories, setCategories] = useState<CategorySpend[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currency, setCurrency] = useState("USD");
 
     // Drill-down state
     const [drillCategory, setDrillCategory] = useState<string | null>(null);
@@ -44,19 +43,14 @@ export default function SpentDetailPage({ params }: { params: Promise<{ ym: stri
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [reassignCatId, setReassignCatId] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
+    const { fmt } = useCurrency();
 
     useEffect(() => {
-        fetch("/api/user/currency")
-            .then((r) => r.json())
-            .then((data) => setCurrency(data.currency || "USD"))
-            .catch(() => { });
         fetch("/api/categories")
             .then((r) => r.json())
             .then((data) => setAllCategories(data || []))
             .catch(() => { });
     }, []);
-
-    const fmt = useCallback((cents: number) => formatCurrency(cents, currency), [currency]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);

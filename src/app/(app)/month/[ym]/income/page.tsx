@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
-import { formatCurrency } from "@/lib/currency";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 interface Transaction {
     id: string;
@@ -27,23 +27,17 @@ export default function IncomeDetailPage({ params }: { params: Promise<{ ym: str
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [allCategories, setAllCategories] = useState<CategoryInfo[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currency, setCurrency] = useState("USD");
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [reassignCatId, setReassignCatId] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
+    const { fmt } = useCurrency();
 
     useEffect(() => {
-        fetch("/api/user/currency")
-            .then((r) => r.json())
-            .then((data) => setCurrency(data.currency || "USD"))
-            .catch(() => { });
         fetch("/api/categories")
             .then((r) => r.json())
             .then((data) => setAllCategories(data || []))
             .catch(() => { });
     }, []);
-
-    const fmt = useCallback((cents: number) => formatCurrency(cents, currency), [currency]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
